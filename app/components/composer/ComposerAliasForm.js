@@ -3,16 +3,20 @@
 import React, { Component } from 'react'
 import ReactCSS from 'reactcss'
 import keytar from 'keytar'
-import { generateKey } from '../../utils/pgp'
+import { generateKey, readArmoredPrivate } from '../../utils/pgp'
 
 import ComposerAliasFormInput from './ComposerAliasFormInput'
+import ComposerAliasFormTextArea from './ComposerAliasFormTextArea'
 import ComposerFormSubmit from './ComposerFormSubmit'
 import ComposerAliasSuccess from './ComposerAliasSuccess'
 
 import colors from '../../assets/styles/variables/colors'
 
 class ComposerAliasForm extends Component {
-  state = { submitted: false }
+  state = {
+    submitted: false,
+    isImporting: false,
+  }
 
   classes() {
     return {
@@ -66,7 +70,7 @@ class ComposerAliasForm extends Component {
         actions: {
           marginTop: '-10px',
           height: '40px',
-          padding: '20px',
+          padding: '10px 20px',
         },
         confirm: {
           color: '#fff',
@@ -99,6 +103,12 @@ class ComposerAliasForm extends Component {
     }
   }
 
+  toggleImport = () => {
+    this.setState({
+      isImporting: !this.state.isImporting,
+    })
+  }
+
   handleConfirm = async () => {
     const name = this.refs.form[0].value
     const email = this.refs.form[1].value
@@ -126,6 +136,34 @@ class ComposerAliasForm extends Component {
     console.log('added key!')
   }
 
+  handleImport = async () => {
+    const passphrase = this.refs.form[0].value
+    const key = await readArmoredPrivate(this.refs.form[1].value)
+    if (key.err) {
+      alert('Invalid private key')
+      return
+    }
+
+    const notification = {
+      title: 'Keys Successfully Imported',
+      body: 'Copy your public key by clicking the icon to the right of your name.'
+    }
+
+    new Notification(notification.title, notification)
+    this.setState({ submitted: true })
+    key.avatar = 9
+    key.id = 999
+    console.log(key)
+
+    if (passphrase) {
+      keytar.addPassword('felony', `${ key.name } <${ key.email }>`, passphrase)
+    }
+
+    await this.props.addKey(key)
+
+    console.log('added key!')
+  }
+
   render() {
     return (
       <div is="wrap" ref="wrap">
@@ -140,38 +178,64 @@ class ComposerAliasForm extends Component {
         <div is="bgGrey">
           { !this.state.submitted ?
             <div>
-              <p is="instructions">To get started, generate your keys.</p>
-              <form is="form" ref="form">
-                <div is="formItem">
-                  <ComposerAliasFormInput
-                    type="text"
-                    ref="textarea"
-                    placeholder={ 'Name' }
-                    onKeyDown={ this.props.handleKeyDown }
-                  />
-                </div>
-                <div is="formItem">
-                  <ComposerAliasFormInput
-                    type="email"
-                    ref="textarea"
-                    placeholder={ 'Email' }
-                    onKeyDown={ this.props.handleKeyDown }
-                  />
-                </div>
-                <div is="formItem">
-                  <ComposerAliasFormInput
-                    type="password"
-                    is="input"
-                    ref="textarea"
-                    placeholder={ 'Passphrase' }
-                    onKeyDown={ this.props.handleKeyDown }
-                  />
-                </div>
-              </form>
+              <p is="instructions">To get started, generate or import your keys.</p>
+              { this.state.isImporting ?
+                <form is="form" ref="form">
+                  <div is="formItem">
+                    <ComposerAliasFormInput
+                      type="password"
+                      is="input"
+                      ref="textarea"
+                      placeholder={ 'Passphrase (if applicable)' }
+                      onKeyDown={ this.props.handleKeyDown }
+                    />
+                  </div>
+                  <div is="formItem">
+                    <ComposerAliasFormTextArea
+                      placeholder={ 'Paste your private key here' }
+                      onKeyDown={ this.props.handleKeyDown }
+                    />
+                  </div>
+                </form>
+                :
+                <form is="form" ref="form">
+                  <div is="formItem">
+                    <ComposerAliasFormInput
+                      type="text"
+                      ref="textarea"
+                      placeholder={ 'Name' }
+                      onKeyDown={ this.props.handleKeyDown }
+                    />
+                  </div>
+                  <div is="formItem">
+                    <ComposerAliasFormInput
+                      type="email"
+                      ref="textarea"
+                      placeholder={ 'Email' }
+                      onKeyDown={ this.props.handleKeyDown }
+                    />
+                  </div>
+                  <div is="formItem">
+                    <ComposerAliasFormInput
+                      type="password"
+                      is="input"
+                      ref="textarea"
+                      placeholder={ 'Passphrase' }
+                      onKeyDown={ this.props.handleKeyDown }
+                    />
+                  </div>
+                </form>
+              }
               <div is="actions">
                 <ComposerFormSubmit
-                  onClick={ this.handleConfirm }
-                  value="Generate"
+                  onClick={ this.state.isImporting ? this.toggleImport : this.handleConfirm }
+                  value={ this.state.isImporting ? "Generate keys" : "Confirm" }
+                />
+              </div>
+              <div is="actions">
+                <ComposerFormSubmit
+                  onClick={ this.state.isImporting ? this.handleImport : this.toggleImport }
+                  value={ this.state.isImporting ? "Confirm" : "Import keys" }
                 />
               </div>
             </div>
